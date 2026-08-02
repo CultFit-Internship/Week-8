@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rep Counter</title>
+<style>
+  body {
+    background: #111; color: #eee; font-family: -apple-system, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; padding: 24px;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+  .video-wrap { position: relative; max-width: 720px; width: 100%; }
+  img { width: 100%; border-radius: 12px; display: block; background: #000; }
+  .controls { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; justify-content: center; }
+  button {
+    background: #222; color: #eee; border: 1px solid #444; border-radius: 8px;
+    padding: 10px 16px; font-size: 14px; cursor: pointer;
+  }
+  button.active { background: #0a7d34; border-color: #0a7d34; }
+  button.reset { background: #7d1a1a; border-color: #7d1a1a; }
+  .stats { margin-top: 14px; font-size: 14px; color: #aaa; }
+</style>
+</head>
+<body>
+  <h1>Live Rep Counter</h1>
+  <div class="video-wrap">
+    <img id="feed" src="/video_feed" alt="live camera feed">
+  </div>
+  <div class="controls" id="exerciseButtons"></div>
+  <div class="controls">
+    <button class="reset" onclick="resetCounter()">Reset Count</button>
+  </div>
+  <div class="stats" id="stats">angle: -- | stage: -- | count: --</div>
+
+<script>
+const btnContainer = document.getElementById('exerciseButtons');
+const statsEl = document.getElementById('stats');
+let currentExercise = 'bicep_curl';
+
+async function loadExercises() {
+  const res = await fetch('/api/exercises');
+  const data = await res.json();
+  btnContainer.innerHTML = '';
+  data.exercises.forEach(ex => {
+    const btn = document.createElement('button');
+    btn.textContent = ex.replace('_', ' ');
+    btn.id = 'btn-' + ex;
+    btn.onclick = () => setExercise(ex);
+    if (ex === currentExercise) btn.classList.add('active');
+    btnContainer.appendChild(btn);
+  });
+}
+
+async function setExercise(ex) {
+  currentExercise = ex;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('btn-' + ex);
+  if (el) el.classList.add('active');
+  await fetch('/api/exercise', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({exercise_type: ex})
+  });
+}
+
+async function resetCounter() {
+  await fetch('/api/reset', {method: 'POST'});
+}
+
+async function pollStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const s = await res.json();
+    statsEl.textContent = `angle: ${s.angle ?? '--'} | stage: ${s.stage} | count: ${s.count} | side: ${s.side}`;
+  } catch (e) { /* server still starting up */ }
+}
+
+loadExercises();
+setInterval(pollStats, 300);
+</script>
+</body>
+</html>
